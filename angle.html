@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>RA/Dec Separation Calculator</title>
+<style>
+  input::placeholder {
+    color: #555;
+  }
+  input {
+    color: black;
+  }
+</style>
+<script>
+function parseSexagesimal(str) {
+    // Allow mixed separators and normalize
+    const cleaned = str.trim().replace(/[^0-9+\-.\s]/g, ' ').replace(/\s+/g, ' ');
+    return cleaned.split(' ');
+}
+
+function hmsToDeg(hms) {
+    const parts = parseSexagesimal(hms);
+    const h = parseFloat(parts[0]);
+    const m = parseFloat(parts[1]);
+    const s = parseFloat(parts[2]);
+    return 15.0 * (h + m / 60.0 + s / 3600.0);
+}
+
+function dmsToDeg(dms) {
+    const parts = parseSexagesimal(dms);
+    const sign = parts[0].startsWith('-') ? -1 : 1;
+    const d = Math.abs(parseFloat(parts[0]));
+    const m = parseFloat(parts[1]);
+    const s = parseFloat(parts[2]);
+    return sign * (d + m / 60.0 + s / 3600.0);
+}
+
+function deg2rad(deg) {
+    return deg * Math.PI / 180.0;
+}
+
+function separation(ra1, dec1, ra2, dec2) {
+    const ra1r = deg2rad(ra1);
+    const dec1r = deg2rad(dec1);
+    const ra2r = deg2rad(ra2);
+    const dec2r = deg2rad(dec2);
+
+    const cosSep = Math.sin(dec1r)*Math.sin(dec2r) +
+                   Math.cos(dec1r)*Math.cos(dec2r)*Math.cos(ra1r - ra2r);
+    const sepRad = Math.acos(Math.min(Math.max(cosSep, -1), 1));
+    const sepDeg = sepRad * 180.0 / Math.PI;
+    const sepArcmin = sepDeg * 60.0;
+    const sepArcsec = sepDeg * 3600.0;
+
+    return {deg: sepDeg, arcmin: sepArcmin, arcsec: sepArcsec};
+}
+
+function compute() {
+    const ra0Str = document.getElementById("ra0").value;
+    const dec0Str = document.getElementById("dec0").value;
+    if (!ra0Str || !dec0Str) {
+        alert("Please enter reference RA and Dec.");
+        return;
+    }
+    const ra0 = hmsToDeg(ra0Str);
+    const dec0 = dmsToDeg(dec0Str);
+
+    const inputTable = document.getElementById("tableInput").value.trim();
+    const lines = inputTable.split("\n");
+
+    let output = `<table border="1" cellpadding="4">
+    <tr><th>RA</th><th>Dec</th><th>Separation (deg)</th><th>(arcmin)</th><th>(arcsec)</th></tr>`;
+
+    lines.forEach(line => {
+        if (line.trim() === "") return;
+        const cleaned = line.trim();
+        const parts = parseSexagesimal(cleaned);
+        if (parts.length < 6) return;
+
+        const raStr = parts.slice(0,3).join(' ');
+        const decStr = parts.slice(3,6).join(' ');
+
+        const ra = hmsToDeg(raStr);
+        const dec = dmsToDeg(decStr);
+        const sep = separation(ra0, dec0, ra, dec);
+
+        output += `<tr><td>${raStr}</td><td>${decStr}</td>
+                   <td>${sep.deg.toFixed(6)}</td>
+                   <td>${sep.arcmin.toFixed(3)}</td>
+                   <td>${sep.arcsec.toFixed(2)}</td></tr>`;
+    });
+
+    output += "</table>";
+    document.getElementById("output").innerHTML = output;
+}
+</script>
+</head>
+<body style="font-family:sans-serif; max-width:800px; margin:auto;">
+
+<h2>RA/Dec Separation Calculator</h2>
+
+<p>Enter reference position (RA and Dec can use colons, spaces, or mixed):</p>
+<div style="display: flex; gap: 1em;">
+  <label>RA: <input type="text" id="ra0" placeholder="05:37:47.36"></label>
+  <label>Dec: <input type="text" id="dec0" placeholder="-69:10:19.9"></label>
+</div>
+
+<p>Enter table of RA/Dec (one per line, fields can mix colons and spaces):</p>
+<textarea id="tableInput" rows="10" cols="60" placeholder="e.g.
+05 37:20 -69:10 25
+05:37 25 -69:10:30"></textarea>
+<br><br>
+<button onclick="compute()">Compute Separations</button>
+
+<h3>Results</h3>
+<div id="output"></div>
+
+</body>
+</html>
+
